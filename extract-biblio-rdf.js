@@ -32,17 +32,20 @@ function extractNextPublication() {
     return parseNextSitemap();
 
   // Download an RDF/XML representation of the publication metadata
-  https.get(publications.shift() + '.rdf', function (response) {
-    if (response.statusCode !== 200) {
-      console.error('Could not download', url, response.statusCode);
-      return extractNextPublication();
-    }
+  download(publications.shift() + '.rdf', function (publication) {
+    // Assign URLs to authors
+    publication = publication.replace(/<bibo:authorList[^]+?<\/bibo:authorList>/, function (authorList) {
+      return authorList.replace(/<rdf:Description>[^]+?<\/rdf:Description>/g, function (author) {
+        var publicationsUrl = author.match(/\/person\/\d+/);
+        return publicationsUrl ? author.replace('>', ' rdf:about="' + publicationsUrl + '#person">') : author;
+      });
+    });
 
     // Convert RDF/XML into Turtle with cwm
     var cwm = spawn('cwm', ['--rdf', '--n3=pq'], { stdio: ['pipe', process.stdout, process.stderr] });
-    response.pipe(cwm.stdin);
     cwm.on('exit', extractNextPublication);
     cwm.on('error', function () { console.error('cwm execution failed; is cwm installed?'); });
+    cwm.stdin.end(publication, 'utf8');
   });
 }
 
