@@ -6,6 +6,8 @@ var https = require('https'),
     spawn = require('child_process').spawn;
 
 var sitemaps = ['https://biblio.ugent.be/siteindex.xml'], publications = [];
+
+console.log('@base <https://biblio.ugent.be/>.');
 parseNextSitemap();
 
 // Parses the next sitemap into sitemap URLs and publication URLs
