@@ -6,9 +6,9 @@ var https = require('https'),
     spawn = require('child_process').spawn;
 
 var sitemaps = ['https://biblio.ugent.be/siteindex.xml'], publications = [];
-var blankId = 0;
+var cwmBlankId = 0;
 
-console.log('@base <https://biblio.ugent.be/>.');
+process.stdout.write('@base <https://biblio.ugent.be/>.\n\n');
 parseNextSitemap();
 
 // Parses the next sitemap into sitemap URLs and publication URLs
@@ -36,7 +36,7 @@ function extractNextPublication() {
   download(publications.shift() + '.rdf', function (publication) {
     // Assign URLs to authors
     publication = publication.replace(/<bibo:authorList[^]+?<\/bibo:authorList>/, function (authorList) {
-      var authors = [];
+      var authors = [], blankId = 0;
       return authorList.replace(/<rdf:Description>[^]+?<\/rdf:Description>/g, function (author) {
         var publicationsUrl = author.match(/\/person\/\d+/), authorId;
         if (publicationsUrl) {
@@ -57,9 +57,18 @@ function extractNextPublication() {
     });
 
     // Convert RDF/XML into Turtle with cwm
-    var cwm = spawn('cwm', ['--rdf', '--n3=pq'], { stdio: ['pipe', process.stdout, process.stderr] });
+    var cwm = spawn('cwm', ['--rdf', '--n3=pqa'], { stdio: ['pipe', 'pipe', process.stderr] }), turtle = '';
     cwm.on('exit', extractNextPublication);
     cwm.on('error', function () { console.error('cwm execution failed; is cwm installed?'); });
+    cwm.stdout.setEncoding('utf8');
+    cwm.stdout.on('data', function (chunk) { turtle += chunk; });
+    cwm.stdout.on('end',  function () {
+      // Make blank node identifiers unique across all publications
+      var blanks = Object.create(null);
+      process.stdout.write(turtle.replace(/_:\w+/g, function (blank) {
+        return blanks[blank] || (blanks[blank] = '_:b' + ++cwmBlankId);
+      }));
+    });
     cwm.stdin.end(publication, 'utf8');
   });
 }
