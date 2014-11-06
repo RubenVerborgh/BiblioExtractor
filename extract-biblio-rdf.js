@@ -6,6 +6,7 @@ var https = require('https'),
     spawn = require('child_process').spawn;
 
 var sitemaps = ['https://biblio.ugent.be/siteindex.xml'], publications = [];
+var blankId = 0;
 
 console.log('@base <https://biblio.ugent.be/>.');
 parseNextSitemap();
@@ -35,10 +36,24 @@ function extractNextPublication() {
   download(publications.shift() + '.rdf', function (publication) {
     // Assign URLs to authors
     publication = publication.replace(/<bibo:authorList[^]+?<\/bibo:authorList>/, function (authorList) {
+      var authors = [];
       return authorList.replace(/<rdf:Description>[^]+?<\/rdf:Description>/g, function (author) {
-        var publicationsUrl = author.match(/\/person\/\d+/);
-        return publicationsUrl ? author.replace('>', ' rdf:about="' + publicationsUrl + '#person">') : author;
-      });
+        var publicationsUrl = author.match(/\/person\/\d+/), authorId;
+        if (publicationsUrl) {
+          authorId = publicationsUrl + '#person';
+          authors.push('rdf:resource="' + authorId + '"');
+          return author.replace('>', ' rdf:about="' + authorId + '">');
+        }
+        else {
+          authorId = 'b' + ++blankId;
+          authors.push('rdf:nodeID="' + authorId + '"');
+          return author.replace('>', ' rdf:nodeID="' + authorId + '">');
+        }
+      }) + '\n' +
+      // Add dcterms:creator statement for each author
+      authors.map(function (author) {
+        return '        <dcterms:creator ' + author + '/>';
+      }).join('\n');
     });
 
     // Convert RDF/XML into Turtle with cwm
