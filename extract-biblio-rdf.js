@@ -59,8 +59,11 @@ function extractNextPublication() {
     // Convert RDF/XML into Turtle with raptor
     var rapper = spawn('rapper', ['-i', 'rdfxml', '-o', 'turtle', '-', '-q', '-I', publicationUrl],
                                  { stdio: ['pipe', 'pipe', process.stderr] }), turtle = '';
-    rapper.on('exit', extractNextPublication);
     rapper.on('error', function () { console.error('rapper execution failed; is raptor2 installed?'); });
+    rapper.on('exit', function (code) {
+      code && console.error('%s could not be processed', publicationUrl);
+      extractNextPublication();
+    });
     rapper.stdout.setEncoding('utf8');
     rapper.stdout.on('data', function (chunk) { turtle += chunk; });
     rapper.stdout.on('end',  function () {
