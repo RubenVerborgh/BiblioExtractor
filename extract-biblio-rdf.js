@@ -6,9 +6,8 @@ var https = require('https'),
     spawn = require('child_process').spawn;
 
 var sitemaps = ['https://biblio.ugent.be/siteindex.xml'], publications = [];
-var cwmBlankId = 0;
+var blankNodeCount = 0;
 
-process.stdout.write('@base <https://biblio.ugent.be/>.\n\n');
 parseNextSitemap();
 
 // Parses the next sitemap into sitemap URLs and publication URLs
@@ -33,7 +32,8 @@ function extractNextPublication() {
     return parseNextSitemap();
 
   // Download an RDF/XML representation of the publication metadata
-  download(publications.shift() + '.rdf', function (publication) {
+  var publicationUrl = publications.shift() + '.rdf';
+  download(publicationUrl, function (publication) {
     // Assign URLs to authors
     publication = publication.replace(/<bibo:authorList[^]+?<\/bibo:authorList>/, function (authorList) {
       var authors = [], blankId = 0;
@@ -56,20 +56,21 @@ function extractNextPublication() {
       }).join('\n');
     });
 
-    // Convert RDF/XML into Turtle with cwm
-    var cwm = spawn('cwm', ['--rdf', '--n3=pqa'], { stdio: ['pipe', 'pipe', process.stderr] }), turtle = '';
-    cwm.on('exit', extractNextPublication);
-    cwm.on('error', function () { console.error('cwm execution failed; is cwm installed?'); });
-    cwm.stdout.setEncoding('utf8');
-    cwm.stdout.on('data', function (chunk) { turtle += chunk; });
-    cwm.stdout.on('end',  function () {
+    // Convert RDF/XML into Turtle with raptor
+    var rapper = spawn('rapper', ['-i', 'rdfxml', '-o', 'turtle', '-', '-q', '-I', publicationUrl],
+                                 { stdio: ['pipe', 'pipe', process.stderr] }), turtle = '';
+    rapper.on('exit', extractNextPublication);
+    rapper.on('error', function () { console.error('rapper execution failed; is raptor2 installed?'); });
+    rapper.stdout.setEncoding('utf8');
+    rapper.stdout.on('data', function (chunk) { turtle += chunk; });
+    rapper.stdout.on('end',  function () {
       // Make blank node identifiers unique across all publications
       var blanks = Object.create(null);
       process.stdout.write(turtle.replace(/_:\w+/g, function (blank) {
-        return blanks[blank] || (blanks[blank] = '_:b' + ++cwmBlankId);
+        return blanks[blank] || (blanks[blank] = '_:b' + ++blankNodeCount);
       }));
     });
-    cwm.stdin.end(publication, 'utf8');
+    rapper.stdin.end(publication, 'utf8');
   });
 }
 
