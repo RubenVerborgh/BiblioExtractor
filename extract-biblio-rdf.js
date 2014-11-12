@@ -20,7 +20,8 @@ function parseNextSitemap() {
   download(sitemapUrl, function (sitemap) {
     var urlMatcher = /<loc>\s*([^>]+)\s*<\/loc>/g, url;
     while ((url = urlMatcher.exec(sitemap)) && (url = url[1]))
-      (/\.xml$/.test(url) ? sitemaps : publications).push(url);
+      if (/sitemap/.test(url)) sitemaps.push(url);
+      else if (/publication/.test(url)) publications.push(url);
     extractNextPublication();
   });
 }
