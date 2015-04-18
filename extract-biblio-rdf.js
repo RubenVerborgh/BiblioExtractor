@@ -68,6 +68,8 @@ function extractNextPublication() {
     rapper.stdout.setEncoding('utf8');
     rapper.stdout.on('data', function (chunk) { turtle += chunk; });
     rapper.stdout.on('end',  function () {
+      // Remove illegal URI characters
+      turte = turtle.replace(/\\u00(?:20|3C|3E)/g, '');
       // Make blank node identifiers unique across all publications
       var blanks = Object.create(null);
       process.stdout.write(turtle.replace(/_:\w+/g, function (blank) {
